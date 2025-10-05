@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-10-04T22:09:00.982665",
-  "total_duration": 43.9806022644043,
+  "timestamp": "2025-10-05T16:13:07.447957",
+  "total_duration": 48.18667221069336,
   "tests": {
     "successful_workflow": {
       "test_name": "successful_workflow",
-      "order_id": "test-success-1759640897",
-      "workflow_id": "order-test-success-1759640897",
+      "order_id": "test-success-1759705939",
+      "workflow_id": "order-test-success-1759705939",
       "monitor_result": {
         "status": "failed",
         "final_step": "RECEIVE",
@@ -15,31 +15,14 @@
         "steps_seen": [
           "RECEIVE"
         ],
-        "duration": 12.23062777519226
+        "duration": 7.188460111618042
       },
       "success": false
     },
     "workflow_cancellation": {
       "test_name": "workflow_cancellation",
-      "order_id": "test-cancel-1759640911",
-      "workflow_id": "order-test-cancel-1759640911",
-      "monitor_result": {
-        "status": "failed",
-        "final_step": "RECEIVE",
-        "errors": [
-          "module 'temporalio.workflow' has no attribute 'ApplicationError'"
-        ],
-        "steps_seen": [
-          "RECEIVE"
-        ],
-        "duration": 2.0568978786468506
-      },
-      "success": true
-    },
-    "address_update": {
-      "test_name": "address_update",
-      "order_id": "test-address-1759640917",
-      "workflow_id": "order-test-address-1759640917",
+      "order_id": "test-cancel-1759705948",
+      "workflow_id": "order-test-cancel-1759705948",
       "monitor_result": {
         "status": "failed",
         "final_step": "RECEIVE",
@@ -49,7 +32,40 @@
         "steps_seen": [
           "RECEIVE"
         ],
-        "duration": 7.141556024551392
+        "duration": 7.133182048797607
+      },
+      "success": true
+    },
+    "address_update": {
+      "test_name": "address_update",
+      "order_id": "test-address-1759705959",
+      "workflow_id": "order-test-address-1759705959",
+      "monitor_result": {
+        "status": "completed",
+        "final_step": "SHIP",
+        "steps_seen": [
+          "RECEIVE",
+          "MANUAL_REVIEW",
+          "PAY",
+          "SHIP"
+        ],
+        "duration": 14.348804712295532,
+        "final_status": {
+          "canceled": false,
+          "errors": [],
+          "max_shipping_retries": 3,
+          "order": {
+            "items": [
+              {
+                "qty": 1,
+                "sku": "ABC"
+              }
+            ],
+            "order_id": "test-address-1759705959"
+          },
+          "shipping_retry_count": 2,
+          "step": "SHIP"
+        }
       },
       "success": true
     },
@@ -61,8 +77,8 @@
       "success_rate": 0.3333333333333333,
       "results": [
         {
-          "order_id": "test-batch-1759640928-0",
-          "workflow_id": "order-test-batch-1759640928-0",
+          "order_id": "test-batch-1759705978-0",
+          "workflow_id": "order-test-batch-1759705978-0",
           "success": false,
           "monitor_result": {
             "status": "failed",
@@ -74,12 +90,12 @@
               "RECEIVE",
               "VALIDATE"
             ],
-            "duration": 7.204085111618042
+            "duration": 9.222318649291992
           }
         },
         {
-          "order_id": "test-batch-1759640928-1",
-          "workflow_id": "order-test-batch-1759640928-1",
+          "order_id": "test-batch-1759705978-1",
+          "workflow_id": "order-test-batch-1759705978-1",
           "success": false,
           "monitor_result": {
             "status": "failed",
@@ -90,12 +106,12 @@
             "steps_seen": [
               "RECEIVE"
             ],
-            "duration": 12.286442995071411
+            "duration": 9.223496198654175
           }
         },
         {
-          "order_id": "test-batch-1759640928-2",
-          "workflow_id": "order-test-batch-1759640928-2",
+          "order_id": "test-batch-1759705978-2",
+          "workflow_id": "order-test-batch-1759705978-2",
           "success": true,
           "monitor_result": {
             "status": "completed",
@@ -103,10 +119,9 @@
             "steps_seen": [
               "RECEIVE",
               "MANUAL_REVIEW",
-              "PAY",
               "SHIP"
             ],
-            "duration": 10.223986148834229,
+            "duration": 5.128171920776367,
             "final_status": {
               "canceled": false,
               "errors": [],
@@ -118,7 +133,7 @@
                     "sku": "ABC"
                   }
                 ],
-                "order_id": "test-batch-1759640928-2"
+                "order_id": "test-batch-1759705978-2"
               },
               "shipping_retry_count": 2,
               "step": "SHIP"

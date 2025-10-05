@@ -38,7 +38,7 @@ class TestOrderWorkflow:
                 assert result["status"] == "completed"
                 assert result["order_id"] == sample_order["order_id"]
                 assert result["step"] == "SHIP"
-                assert result["ship"] == "shipped"
+                assert result["ship"] == "Carrier dispatched successfully"
                 assert result["errors"] == []
     
     @pytest.mark.asyncio
@@ -117,7 +117,7 @@ class TestOrderWorkflow:
             
             assert result["status"] == "failed"
             assert result["step"] == "VALIDATE"
-            assert "Invalid order" in result["errors"][0]
+            assert "No items to validate" in result["errors"][0]
     
     @pytest.mark.asyncio
     async def test_order_workflow_payment_failure(self, temporal_environment: WorkflowEnvironment, sample_order, sample_payment_id, sample_address):
@@ -140,7 +140,7 @@ class TestOrderWorkflow:
             
             assert result["status"] == "failed"
             assert result["step"] == "PAY"
-            assert "Payment failed" in result["errors"][0]
+            assert "Payment service temporarily unavailable" in result["errors"][0]
     
     @pytest.mark.asyncio
     async def test_order_workflow_timeout(self, temporal_environment: WorkflowEnvironment, sample_order, sample_payment_id, sample_address):

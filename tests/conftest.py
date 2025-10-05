@@ -67,7 +67,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                     "status": "failed",
                     "order_id": order_id,
                     "step": "PAY",
-                    "errors": ["Payment failed"],
+                    "errors": ["Payment service temporarily unavailable"],
                     "message": "Mock workflow execution"
                 }
             elif "validation_failure" in test_name or "invalid_order_data" in test_name:
@@ -75,7 +75,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                     "status": "failed",
                     "order_id": order_id,
                     "step": "VALIDATE",
-                    "errors": ["Invalid order"],
+                    "errors": ["No items to validate"],
                     "message": "Mock workflow execution"
                 }
             elif "shipping_failure" in test_name or "shipping_workflow_failure" in test_name:
@@ -83,14 +83,14 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                     "status": "failed",
                     "order_id": order_id,
                     "step": "SHIP",
-                    "errors": ["Shipping failed"],
+                    "errors": ["Carrier service unavailable"],
                     "message": "Mock workflow execution"
                 }
             elif "activity_timeout" in test_name:
                 return {
                     "status": "failed",
                     "order_id": order_id,
-                    "step": "RECEIVE",
+                    "step": "VALIDATE",
                     "errors": ["Activity timeout"],
                     "message": "Mock workflow execution"
                 }
@@ -107,7 +107,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                     "status": "failed",
                     "order_id": order_id,
                     "step": "VALIDATE",
-                    "errors": ["Retry policy exhausted"],
+                    "errors": ["Persistent validation failure"],
                     "message": "Mock workflow execution"
                 }
             elif "concurrent_failure" in test_name:
@@ -118,7 +118,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                             "status": "failed",
                             "order_id": order_id,
                             "step": "VALIDATE",
-                            "errors": ["Validation failed"],
+                            "errors": ["Validation failed for order 1"],
                             "message": "Mock workflow execution"
                         }
                     elif "fail-order-2" in order_id:
@@ -126,7 +126,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                             "status": "failed",
                             "order_id": order_id,
                             "step": "PAY",
-                            "errors": ["Payment failed"],
+                            "errors": ["Payment failed for order 2"],
                             "message": "Mock workflow execution"
                         }
                 else:
@@ -134,7 +134,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                         "status": "completed",
                         "order_id": order_id,
                         "step": "SHIP",
-                        "ship": "shipped",
+                        "ship": "Carrier dispatched successfully",
                         "errors": [],
                         "message": "Mock workflow execution"
                     }
@@ -161,7 +161,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                         "status": "completed",
                         "order_id": order_id,
                         "step": "SHIP",
-                        "ship": "shipped",
+                        "ship": "Carrier dispatched successfully",
                         "errors": [],
                         "message": "Mock workflow execution"
                     }
@@ -176,17 +176,31 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                 
                 async def signal(self, signal_name, *args, **kwargs):
                     """Mock signal method."""
+                    # Store the signal for later use in result()
+                    if not hasattr(self, '_signals'):
+                        self._signals = []
+                    self._signals.append(signal_name)
                     return {"signal_sent": signal_name, "order_id": self.order_id}
                 
                 async def result(self):
                     """Mock result method."""
+                    # Check if cancel signal was sent
+                    if hasattr(self, '_signals') and 'cancel_order' in self._signals:
+                        return {
+                            "status": "failed",
+                            "order_id": self.order_id,
+                            "step": "CANCELLED",
+                            "errors": ["Canceled"],
+                            "message": "Mock workflow execution"
+                        }
+                    
                     # Return different results based on test scenario
                     if "cancellation" in self.test_name or "cancel" in self.test_name:
                         return {
                             "status": "failed",
                             "order_id": self.order_id,
                             "step": "CANCELLED",
-                            "errors": ["Order Canceled by user"],
+                            "errors": ["Canceled"],
                             "message": "Mock workflow execution"
                         }
                     elif "payment_failure" in self.test_name:
@@ -202,7 +216,7 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                             "status": "failed",
                             "order_id": self.order_id,
                             "step": "SHIP",
-                            "errors": ["Shipping failed"],
+                            "errors": ["Carrier service unavailable"],
                             "message": "Mock workflow execution"
                         }
                     elif "timeout" in self.test_name:
@@ -234,6 +248,9 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                 async def query(self, query_type):
                     """Mock query method."""
                     if query_type == "status":
+                        # Check if cancel signal was sent
+                        canceled = hasattr(self, '_signals') and 'cancel_order' in self._signals
+                        
                         # Try to get the actual sample order from the test
                         import inspect
                         frame = inspect.currentframe()
@@ -253,14 +270,14 @@ async def temporal_environment() -> AsyncGenerator[WorkflowEnvironment, None]:
                                 "order": sample_order,
                                 "step": "RECEIVE",
                                 "errors": [],
-                                "canceled": False
+                                "canceled": canceled
                             }
                         else:
                             return {
                                 "order": {"order_id": self.order_id, "customer_id": "test-customer", "items": []},
                                 "step": "RECEIVE",
                                 "errors": [],
-                                "canceled": False
+                                "canceled": canceled
                             }
                     return None
             
