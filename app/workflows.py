@@ -40,7 +40,8 @@ class ShippingWorkflow:
         except Exception as e:
             # Signal parent that dispatch failed
             await workflow.signal_external_workflow(workflow.info().parent_workflow_id, "dispatch_failed", str(e))
-            raise
+            # Don't re-raise - let parent handle retry logic
+            raise workflow.ApplicationError(f"Shipping workflow failed: {str(e)}")
 
 @workflow.defn
 class OrderWorkflow:
@@ -50,6 +51,8 @@ class OrderWorkflow:
         self.canceled: bool = False
         self.errors: list[str] = []
         self.step: str = "INIT"
+        self.shipping_retry_count: int = 0
+        self.max_shipping_retries: int = 3
 
     @workflow.run
     async def run(self, db_url: str, order_id: str, payment_id: str, address: Dict[str, Any]) -> Dict[str, Any]:
@@ -86,14 +89,9 @@ class OrderWorkflow:
                                             task_queue=ORDER_TASK_QUEUE)
             if self.canceled: raise workflow.ApplicationError("Canceled")
 
-            # Child workflow on separate task queue
+            # Child workflow on separate task queue with retry logic
             self.step = "SHIP"
-            handle = await workflow.start_child_workflow(ShippingWorkflow.run, 
-                                                         args=[db_url, self.order],
-                                                         id=f"ship-{order_id}",
-                                                         task_queue=SHIPPING_TASK_QUEUE,
-                                                         retry_policy=RetryPolicy(maximum_attempts=1))
-            res = await handle.result()
+            res = await self._execute_shipping_with_retry(db_url, order_id)
 
             return {"status": "completed", "order_id": order_id, "step": self.step, "ship": res, "errors": self.errors}
         except Exception as e:
@@ -108,7 +106,36 @@ class OrderWorkflow:
 
     def _on_dispatch_failed(self, reason: str) -> None:
         self.errors.append(f"dispatch_failed: {reason}")
+        # Don't fail the workflow - let the retry logic handle it
+
+    async def _execute_shipping_with_retry(self, db_url: str, order_id: str) -> str:
+        """Execute shipping workflow with retry logic."""
+        while self.shipping_retry_count < self.max_shipping_retries:
+            try:
+                self.shipping_retry_count += 1
+                handle = await workflow.start_child_workflow(ShippingWorkflow.run, 
+                                                             args=[db_url, self.order],
+                                                             id=f"ship-{order_id}-attempt-{self.shipping_retry_count}",
+                                                             task_queue=SHIPPING_TASK_QUEUE,
+                                                             retry_policy=RetryPolicy(maximum_attempts=1))
+                res = await handle.result()
+                return res
+            except Exception as e:
+                if self.shipping_retry_count >= self.max_shipping_retries:
+                    # Final attempt failed - raise the error
+                    raise workflow.ApplicationError(f"Shipping failed after {self.max_shipping_retries} attempts: {str(e)}")
+                else:
+                    # Wait before retry (exponential backoff)
+                    await asyncio.sleep(2 ** self.shipping_retry_count)
+                    continue
 
     @workflow.query
     def status(self) -> Dict[str, Any]:
-        return {"order": self.order, "step": self.step, "errors": self.errors, "canceled": self.canceled}
+        return {
+            "order": self.order, 
+            "step": self.step, 
+            "errors": self.errors, 
+            "canceled": self.canceled,
+            "shipping_retry_count": self.shipping_retry_count,
+            "max_shipping_retries": self.max_shipping_retries
+        }
