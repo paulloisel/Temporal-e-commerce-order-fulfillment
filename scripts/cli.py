@@ -171,22 +171,6 @@ class TemporalCLI:
                     error = await response.text()
                     print(f"❌ Failed to update address: {error}")
                     return None
-
-    async def approve_order(self, order_id: str):
-        """Approve workflow for payment."""
-        async with self.connect_api() as session:
-            async with session.post(
-                f"{self.api_base}/orders/{order_id}/signals/approve",
-                headers={"Content-Type": "application/json"}
-            ) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    print(f"✅ Order approved for {order_id}: {result}")
-                    return result
-                else:
-                    error = await response.text()
-                    print(f"❌ Failed to approve order: {error}")
-                    return None
     
     async def list_workflows(self, limit: int = 20):
         """List recent workflows using Temporal CLI."""
@@ -332,9 +316,6 @@ async def main():
     update_parser.add_argument("--zip", default="54321", help="ZIP code")
     update_parser.add_argument("--country", default="US", help="Country")
     
-    approve_parser = subparsers.add_parser("approve", help="Approve a workflow for payment")
-    approve_parser.add_argument("order_id", help="Order ID")
-    
     # Inspection
     list_parser = subparsers.add_parser("list", help="List recent workflows")
     list_parser.add_argument("--limit", type=int, default=20, help="Number of workflows to show")
@@ -384,8 +365,6 @@ async def main():
                 "country": args.country
             }
             await cli.update_address(args.order_id, address)
-        elif args.command == "approve":
-            await cli.approve_order(args.order_id)
         elif args.command == "list":
             await cli.list_workflows(args.limit)
         elif args.command == "describe":

@@ -164,30 +164,6 @@ curl -X POST "http://localhost:8000/orders/order-123/signals/update-address" \
   }'
 ```
 
-### Approve Order
-
-Approve an order for payment processing. This signal is required to proceed from the manual review step to payment.
-
-**Endpoint**: `POST /orders/{order_id}/signals/approve`
-
-**Parameters**:
-- `order_id` (path): Order identifier
-
-**Request Body**: None required
-
-**Response**:
-```json
-{
-  "ok": true
-}
-```
-
-**Example**:
-```bash
-curl -X POST "http://localhost:8000/orders/order-123/signals/approve" \
-  -H "Content-Type: application/json"
-```
-
 ## Error Responses
 
 All endpoints may return error responses in the following format:

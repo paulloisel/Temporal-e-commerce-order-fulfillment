@@ -20,7 +20,6 @@ python scripts/cli.py <command> [options]
 - `status <order_id>` - Get workflow status
 - `cancel <order_id>` - Cancel a workflow
 - `update-address <order_id> [options]` - Update workflow address
-- `approve <order_id>` - Approve workflow for payment
 - `list [--limit N]` - List recent workflows
 - `describe <workflow_id>` - Describe a specific workflow
 - `history <workflow_id>` - Show workflow execution history
@@ -43,9 +42,6 @@ python scripts/cli.py cancel order-123
 
 # Update address
 python scripts/cli.py update-address order-123 --street "456 New St" --city "New City"
-
-# Approve workflow for payment
-python scripts/cli.py approve order-123
 
 # List workflows
 python scripts/cli.py list --limit 10
