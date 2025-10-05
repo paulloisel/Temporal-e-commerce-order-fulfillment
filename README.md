@@ -27,73 +27,93 @@ docker compose up --build
 ./scripts/quick-start.sh
 ```
 
-## 🎯 Features
+## 🎯 How to Start Services
 
-- **OrderWorkflow**: Parent workflow with signals, timers, and child workflows
-- **ShippingWorkflow**: Child workflow on separate task queue
-- **Database Persistence**: PostgreSQL with migrations and idempotency
-- **FastAPI**: REST API for workflow management
-- **Docker Compose**: Complete local deployment
-- **CLI Tools**: Command-line interface for operations
-- **Comprehensive Testing**: Unit, integration, and E2E tests
-- **15-Second Deadline**: Workflow completion time constraint
+### Start Temporal Server and Database
+```bash
+# Start all services (Temporal, PostgreSQL, FastAPI)
+docker compose up --build
 
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   FastAPI       │    │   Temporal      │    │   PostgreSQL    │
-│   (Port 8000)   │◄──►│   (Port 7233)   │◄──►│   (Port 5432)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+# Or start services individually
+docker compose up -d postgres temporal
+docker compose up app
 ```
 
-## 🛠️ CLI Usage
+### Verify Services
+```bash
+# Check service status
+docker compose ps
 
+# Test API
+curl http://localhost:8000/docs
+
+# Test Temporal UI
+open http://localhost:8233
+```
+
+## 🛠️ How to Run Workers and Trigger Workflows
+
+### CLI Commands
 ```bash
 # Start a workflow
 python scripts/cli.py start-workflow order-123 pmt-123
 
-# Check status
+# Check workflow status
 python scripts/cli.py status order-123
 
-# Cancel workflow
-python scripts/cli.py cancel order-123
-
-# List workflows
+# List recent workflows
 python scripts/cli.py list
 
 # Run demo
 python scripts/cli.py demo
-
-# Run tests
-python scripts/test-workflow.py
 ```
 
-## 📋 API Endpoints
+### API Endpoints
+```bash
+# Start workflow via API
+curl -X POST "http://localhost:8000/orders/order-123/start" \
+  -H "Content-Type: application/json" \
+  -d '{"payment_id": "pmt-123", "address": {"street": "123 Main St", "city": "Test City"}}'
 
-| Method | Path | Description |
-|--------|------|-------------|
-| **POST** | `/orders/{order_id}/start` | Starts `OrderWorkflow` with payment info |
-| **GET** | `/orders/{order_id}/status` | Queries workflow status |
-| **POST** | `/orders/{order_id}/signals/cancel` | Sends cancel signal |
-| **POST** | `/orders/{order_id}/signals/update-address` | Updates shipping address |
+# Get status
+curl "http://localhost:8000/orders/order-123/status"
+```
 
-## 🔄 Workflow Design
+## 📡 How to Send Signals and Query/Inspect State
 
-### OrderWorkflow (Parent)
-- **Steps**: `ReceiveOrder → ValidateOrder → (Timer: ManualReview) → ChargePayment → ShippingWorkflow`
-- **Signals**: `CancelOrder`, `UpdateAddress`, `DispatchFailed`
-- **Timer**: 2-second manual review delay
-- **Child Workflow**: `ShippingWorkflow` on separate task queue
-- **Time Constraint**: 15 seconds total execution
+### Send Signals
+```bash
+# Cancel workflow
+python scripts/cli.py cancel order-123
+# or via API:
+curl -X POST "http://localhost:8000/orders/order-123/signals/cancel"
 
-### ShippingWorkflow (Child)
-- **Activities**: `PreparePackage`, `DispatchCarrier`
-- **Parent Notification**: Signals back on failure
-- **Task Queue**: `shipping-tq` (isolated from `orders-tq`)
+# Update address
+python scripts/cli.py update-address order-123 --street "456 New St" --city "New City"
+# or via API:
+curl -X POST "http://localhost:8000/orders/order-123/signals/update-address" \
+  -H "Content-Type: application/json" \
+  -d '{"address": {"street": "456 New St", "city": "New City"}}'
+```
 
-## 🗄️ Database Schema
+### Query/Inspect State
+```bash
+# Get workflow status
+python scripts/cli.py status order-123
 
+# Describe workflow details
+python scripts/cli.py describe order-123
+
+# Show workflow history
+python scripts/cli.py history order-123
+
+# View service logs
+python scripts/cli.py logs --service app
+```
+
+## 🗄️ Schema/Migrations and Persistence Rationale
+
+### Database Schema
 ```sql
 -- Orders with JSONB address
 CREATE TABLE orders (
@@ -123,20 +143,49 @@ CREATE TABLE events (
 );
 ```
 
-## 🧪 Testing
+### Persistence Rationale
+- **Idempotency**: Payment processing uses unique `payment_id` for safe retries
+- **JSONB**: Flexible address storage with PostgreSQL JSONB support
+- **Event Logging**: Complete audit trail for debugging and compliance
+- **Connection Pooling**: Efficient database connections for performance
 
+## 🧪 Tests and How to Run Them
+
+### Run All Tests
 ```bash
-# Run all tests
-python -m pytest
+# Unit tests (41 tests)
+python -m pytest tests/unit/
 
-# Run specific categories
-python -m pytest tests/unit/      # Unit tests
-python -m pytest tests/integration/  # Integration tests  
-python -m pytest tests/e2e/       # End-to-end tests
+# Integration tests
+python -m pytest tests/integration/
 
-# Run CLI test suite
+# End-to-end tests
+python -m pytest tests/e2e/
+
+# CLI test suite
 python scripts/test-workflow.py
 ```
+
+### Test Categories
+- **Unit Tests**: Individual components (activities, workflows, API)
+- **Integration Tests**: API and database interactions
+- **E2E Tests**: Complete workflow scenarios
+- **CLI Tests**: Command-line interface functionality
+
+## 🔄 Workflow Design
+
+### OrderWorkflow (Parent)
+- **Steps**: `ReceiveOrder → ValidateOrder → (Timer: ManualReview) → ChargePayment → ShippingWorkflow`
+- **Signals**: `CancelOrder`, `UpdateAddress`, `DispatchFailed`
+- **Timer**: 2-second manual review delay
+- **Child Workflow**: `ShippingWorkflow` on separate task queue
+- **Time Constraint**: 15 seconds total execution
+- **Retry Logic**: Shipping retries up to 3 times with exponential backoff
+
+### ShippingWorkflow (Child)
+- **Activities**: `PreparePackage`, `DispatchCarrier`
+- **Parent Notification**: Signals back on failure
+- **Task Queue**: `shipping-tq` (isolated from `orders-tq`)
 
 ## 📊 Function Stubs Implementation
 
@@ -183,21 +232,16 @@ python scripts/cli.py describe <workflow_id>
 - Database operations are idempotent with proper conflict handling
 - External side effects recorded after success
 
-### Database Persistence
-- Real PostgreSQL database with migrations
-- JSONB columns for flexible data storage
-- Event logging for audit trails
-- Connection pooling for performance
-
 ### Error Handling
 - Activity retries with exponential backoff
 - Workflow-level error collection
 - Signal handling for cancellations
 - Timeout management with 15-second deadline
+- **Shipping retry logic**: Parent retries shipping up to 3 times
 
 ### Observability
 - Structured logging with step tracking
-- Workflow status queries
+- Workflow status queries with retry information
 - Event history in Temporal UI
 - Database event logging
 
@@ -207,34 +251,17 @@ python scripts/cli.py describe <workflow_id>
 - Independent scaling and deployment
 - Clear separation of concerns
 
-## 🛑 Why We Use Temporal
+## 🏗️ Architecture
 
-Trellis coordinates long-running, stateful operations where reliability and clear audit trails matter. Temporal provides:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   FastAPI       │    │   Temporal      │    │   PostgreSQL    │
+│   (Port 8000)   │◄──►│   (Port 7233)   │◄──►│   (Port 5432)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
-- **Durability & fault tolerance**: Workflow state persisted, workers can crash without losing progress
-- **Deterministic orchestration**: Control plane encoded once, consistent decisions across retries
-- **Idempotent side effects**: Activities retried safely with proper idempotency
-- **Human-in-the-loop**: Signals and timers for manual approvals and SLAs
-- **Observability by design**: Event history as truthful source for debugging
+## 📚 Project Structure
 
-## 📚 Documentation
-
-- **[Deployment Guide](DEPLOYMENT_GUIDE.md)**: Complete setup and operations guide
-- **[CLI Scripts](scripts/README.md)**: Command-line tools documentation
-- **[Test Reports](test_report.json)**: Latest test results and analysis
-
-## 🎯 Evaluation Criteria
-
-✅ **Correct Temporal primitives**: Workflows, activities, signals, timers, child workflows, task queues  
-✅ **Clean, readable code**: Well-structured, documented, deterministic behavior  
-✅ **Proper persistence**: Real database with idempotent payment logic  
-✅ **Easy local spin-up**: Docker Compose with clear instructions  
-✅ **Clear observability**: Logs, queries, Temporal UI integration  
-✅ **15-second completion**: Workflow deadline enforced and tested  
-
-## 🔧 Development
-
-### Project Structure
 ```
 app/
 ├── workflows.py      # Temporal workflow definitions
@@ -251,25 +278,54 @@ scripts/
 └── quick-start.sh   # Setup script
 
 tests/
-├── unit/            # Unit tests
+├── unit/            # Unit tests (41 tests)
 ├── integration/     # Integration tests
 └── e2e/            # End-to-end tests
 ```
 
-### Adding Features
-1. Update workflows in `app/workflows.py`
-2. Add activities in `app/activities.py`
-3. Update API in `app/api.py`
-4. Add tests in `tests/`
-5. Update CLI in `scripts/`
+## 🎯 Evaluation Criteria
 
-## 📞 Support
+✅ **Correct Temporal primitives**: Workflows, activities, signals, timers, child workflows, task queues  
+✅ **Clean, readable code**: Well-structured, documented, deterministic behavior  
+✅ **Proper persistence**: Real database with idempotent payment logic  
+✅ **Easy local spin-up**: Docker Compose with clear instructions  
+✅ **Clear observability**: Logs, queries, Temporal UI integration  
+✅ **15-second completion**: Workflow deadline enforced and tested  
+✅ **Shipping retry logic**: Parent retries shipping failures with exponential backoff
 
-For issues:
-1. Check [Deployment Guide](DEPLOYMENT_GUIDE.md) troubleshooting
-2. Use CLI tools for debugging: `python scripts/cli.py logs`
-3. Check Temporal UI: http://localhost:8233
-4. Review test suite for expected behavior
+## 🛑 Why We Use Temporal
+
+Trellis coordinates long-running, stateful operations where reliability and clear audit trails matter. Temporal provides:
+
+- **Durability & fault tolerance**: Workflow state persisted, workers can crash without losing progress
+- **Deterministic orchestration**: Control plane encoded once, consistent decisions across retries
+- **Idempotent side effects**: Activities retried safely with proper idempotency
+- **Human-in-the-loop**: Signals and timers for manual approvals and SLAs
+- **Observability by design**: Event history as truthful source for debugging
+
+## 🔧 Troubleshooting
+
+### Common Issues
+```bash
+# Services not starting
+docker compose logs app
+docker compose logs temporal
+docker compose logs postgres
+
+# Workflow failures
+python scripts/cli.py list
+python scripts/cli.py describe <workflow_id>
+
+# Connection issues
+curl http://localhost:8000/docs
+open http://localhost:8233
+```
+
+### Performance Tuning
+- **Activity Timeouts**: 3-5 seconds per activity
+- **Retry Policies**: Maximum 3 attempts
+- **Task Queues**: Separate queues for order and shipping activities
+- **Shipping Retries**: Up to 3 attempts with exponential backoff
 
 ---
 

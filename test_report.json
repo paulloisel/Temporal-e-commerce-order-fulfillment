@@ -1,0 +1,136 @@
+{
+  "timestamp": "2025-10-04T22:09:00.982665",
+  "total_duration": 43.9806022644043,
+  "tests": {
+    "successful_workflow": {
+      "test_name": "successful_workflow",
+      "order_id": "test-success-1759640897",
+      "workflow_id": "order-test-success-1759640897",
+      "monitor_result": {
+        "status": "failed",
+        "final_step": "RECEIVE",
+        "errors": [
+          "Activity task timed out"
+        ],
+        "steps_seen": [
+          "RECEIVE"
+        ],
+        "duration": 12.23062777519226
+      },
+      "success": false
+    },
+    "workflow_cancellation": {
+      "test_name": "workflow_cancellation",
+      "order_id": "test-cancel-1759640911",
+      "workflow_id": "order-test-cancel-1759640911",
+      "monitor_result": {
+        "status": "failed",
+        "final_step": "RECEIVE",
+        "errors": [
+          "module 'temporalio.workflow' has no attribute 'ApplicationError'"
+        ],
+        "steps_seen": [
+          "RECEIVE"
+        ],
+        "duration": 2.0568978786468506
+      },
+      "success": true
+    },
+    "address_update": {
+      "test_name": "address_update",
+      "order_id": "test-address-1759640917",
+      "workflow_id": "order-test-address-1759640917",
+      "monitor_result": {
+        "status": "failed",
+        "final_step": "RECEIVE",
+        "errors": [
+          "Activity task timed out"
+        ],
+        "steps_seen": [
+          "RECEIVE"
+        ],
+        "duration": 7.141556024551392
+      },
+      "success": true
+    },
+    "batch_workflows": {
+      "test_name": "batch_workflows",
+      "total_workflows": 3,
+      "successful": 1,
+      "failed": 2,
+      "success_rate": 0.3333333333333333,
+      "results": [
+        {
+          "order_id": "test-batch-1759640928-0",
+          "workflow_id": "order-test-batch-1759640928-0",
+          "success": false,
+          "monitor_result": {
+            "status": "failed",
+            "final_step": "VALIDATE",
+            "errors": [
+              "Activity task failed"
+            ],
+            "steps_seen": [
+              "RECEIVE",
+              "VALIDATE"
+            ],
+            "duration": 7.204085111618042
+          }
+        },
+        {
+          "order_id": "test-batch-1759640928-1",
+          "workflow_id": "order-test-batch-1759640928-1",
+          "success": false,
+          "monitor_result": {
+            "status": "failed",
+            "final_step": "RECEIVE",
+            "errors": [
+              "Activity task timed out"
+            ],
+            "steps_seen": [
+              "RECEIVE"
+            ],
+            "duration": 12.286442995071411
+          }
+        },
+        {
+          "order_id": "test-batch-1759640928-2",
+          "workflow_id": "order-test-batch-1759640928-2",
+          "success": true,
+          "monitor_result": {
+            "status": "completed",
+            "final_step": "SHIP",
+            "steps_seen": [
+              "RECEIVE",
+              "MANUAL_REVIEW",
+              "PAY",
+              "SHIP"
+            ],
+            "duration": 10.223986148834229,
+            "final_status": {
+              "canceled": false,
+              "errors": [],
+              "max_shipping_retries": 3,
+              "order": {
+                "items": [
+                  {
+                    "qty": 1,
+                    "sku": "ABC"
+                  }
+                ],
+                "order_id": "test-batch-1759640928-2"
+              },
+              "shipping_retry_count": 2,
+              "step": "SHIP"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed": 2,
+    "failed": 2
+  }
+}
