@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from typing import Optional, Dict, Any
+from datetime import timedelta
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from temporalio.client import Client
@@ -22,12 +23,15 @@ async def start(order_id: str, body: StartBody):
     client: Client = app.state.client
     handle = await client.start_workflow(
         OrderWorkflow.run,
-        DATABASE_URL.replace("+asyncpg", ""),  # pass raw URL for asyncpg
-        order_id,
-        body.payment_id,
-        body.address or {},
+        args=[
+            DATABASE_URL.replace("+asyncpg", ""),  # pass raw URL for asyncpg
+            order_id,
+            body.payment_id,
+            body.address or {},
+        ],
         id=f"order-{order_id}",
         task_queue=ORDER_TASK_QUEUE,
+        run_timeout=timedelta(seconds=15),
     )
     return {"workflow_id": handle.id, "run_id": handle.first_execution_run_id}
 

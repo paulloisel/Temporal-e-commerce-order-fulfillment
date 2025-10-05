@@ -1,7 +1,10 @@
 from __future__ import annotations
+import asyncio
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional, Dict, Any
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 from .config import ORDER_TASK_QUEUE, SHIPPING_TASK_QUEUE
 
@@ -23,12 +26,16 @@ class ShippingWorkflow:
     async def run(self, db_url: str, order: Dict[str, Any]) -> str:
         self.order = order
         try:
-            await workflow.execute_activity("PreparePackage", db_url, order,
-                                            start_to_close_timeout=5,
-                                            retry_policy=workflow.RetryPolicy(maximum_attempts=3))
-            res = await workflow.execute_activity("DispatchCarrier", db_url, order,
-                                                  start_to_close_timeout=5,
-                                                  retry_policy=workflow.RetryPolicy(maximum_attempts=3))
+            await workflow.execute_activity("PreparePackage", 
+                                            args=[db_url, order],
+                                            start_to_close_timeout=timedelta(seconds=5),
+                                            retry_policy=RetryPolicy(maximum_attempts=3),
+                                            task_queue=SHIPPING_TASK_QUEUE)
+            res = await workflow.execute_activity("DispatchCarrier", 
+                                                  args=[db_url, order],
+                                                  start_to_close_timeout=timedelta(seconds=5),
+                                                  retry_policy=RetryPolicy(maximum_attempts=3),
+                                                  task_queue=SHIPPING_TASK_QUEUE)
             return res
         except Exception as e:
             # Signal parent that dispatch failed
@@ -46,45 +53,48 @@ class OrderWorkflow:
 
     @workflow.run
     async def run(self, db_url: str, order_id: str, payment_id: str, address: Dict[str, Any]) -> Dict[str, Any]:
-        # Enforce overall deadline ~15s
-        overall_timer = workflow.start_timer(15)
-
         workflow.set_signal_handler("cancel_order", self._on_cancel)
         workflow.set_signal_handler("update_address", self._on_update_address)
         workflow.set_signal_handler("dispatch_failed", self._on_dispatch_failed)
 
         try:
             self.step = "RECEIVE"
-            self.order = await workflow.execute_activity("ReceiveOrder", db_url, order_id,
-                                                        start_to_close_timeout=3,
-                                                        retry_policy=workflow.RetryPolicy(maximum_attempts=3))
+            self.order = await workflow.execute_activity("ReceiveOrder", 
+                                                        args=[db_url, order_id],
+                                                        start_to_close_timeout=timedelta(seconds=3),
+                                                        retry_policy=RetryPolicy(maximum_attempts=3),
+                                                        task_queue=ORDER_TASK_QUEUE)
             if self.canceled: raise workflow.ApplicationError("Canceled")
 
             self.step = "VALIDATE"
-            await workflow.execute_activity("ValidateOrder", db_url, self.order,
-                                            start_to_close_timeout=3,
-                                            retry_policy=workflow.RetryPolicy(maximum_attempts=3))
+            await workflow.execute_activity("ValidateOrder", 
+                                            args=[db_url, self.order],
+                                            start_to_close_timeout=timedelta(seconds=3),
+                                            retry_policy=RetryPolicy(maximum_attempts=3),
+                                            task_queue=ORDER_TASK_QUEUE)
             if self.canceled: raise workflow.ApplicationError("Canceled")
 
             # Manual review timer (simulated delay)
             self.step = "MANUAL_REVIEW"
-            await workflow.sleep(1.0)  # simulate quick human approval
+            await asyncio.sleep(2)
 
             self.step = "PAY"
-            await workflow.execute_activity("ChargePayment", db_url, self.order, payment_id,
-                                            start_to_close_timeout=4,
-                                            retry_policy=workflow.RetryPolicy(maximum_attempts=3))
+            await workflow.execute_activity("ChargePayment", 
+                                            args=[db_url, self.order, payment_id],
+                                            start_to_close_timeout=timedelta(seconds=4),
+                                            retry_policy=RetryPolicy(maximum_attempts=3),
+                                            task_queue=ORDER_TASK_QUEUE)
             if self.canceled: raise workflow.ApplicationError("Canceled")
 
             # Child workflow on separate task queue
             self.step = "SHIP"
-            handle = await workflow.start_child_workflow(ShippingWorkflow.run, db_url, self.order,
+            handle = await workflow.start_child_workflow(ShippingWorkflow.run, 
+                                                         args=[db_url, self.order],
                                                          id=f"ship-{order_id}",
                                                          task_queue=SHIPPING_TASK_QUEUE,
-                                                         retry_policy=workflow.RetryPolicy(maximum_attempts=1))
+                                                         retry_policy=RetryPolicy(maximum_attempts=1))
             res = await handle.result()
 
-            await overall_timer  # ensure within deadline (raises if exceeded)
             return {"status": "completed", "order_id": order_id, "step": self.step, "ship": res, "errors": self.errors}
         except Exception as e:
             self.errors.append(str(e))

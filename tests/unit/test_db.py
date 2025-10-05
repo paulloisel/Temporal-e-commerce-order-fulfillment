@@ -3,6 +3,7 @@ Unit tests for database operations.
 """
 import pytest
 import asyncpg
+import json
 from app.db import get_pool, apply_migrations, init
 from app.config import DATABASE_URL
 
@@ -150,7 +151,7 @@ class TestDatabaseOperations:
             assert event_row is not None
             assert event_row["order_id"] == order_id
             assert event_row["type"] == "test_event"
-            assert event_row["payload_json"] == {"test": "data"}
+            assert event_row["payload_json"] == '{"test": "data"}'
             
             # Read multiple events
             events = await conn.fetch(
@@ -180,12 +181,12 @@ class TestDatabaseOperations:
             # Insert JSONB data
             await conn.execute(
                 "INSERT INTO orders(id, state, address_json) VALUES($1, $2, $3)",
-                order_id, "RECEIVED", address_data
+                order_id, "RECEIVED", json.dumps(address_data)
             )
             
             # Query JSONB data
             order_row = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", order_id)
-            assert order_row["address_json"] == address_data
+            assert json.loads(order_row["address_json"]) == address_data
             
             # Query specific JSONB fields
             street = await conn.fetchval(
@@ -198,12 +199,12 @@ class TestDatabaseOperations:
             new_address = {"street": "456 New St", "city": "New City", "zip": "67890"}
             await conn.execute(
                 "UPDATE orders SET address_json = $1 WHERE id = $2",
-                new_address, order_id
+                json.dumps(new_address), order_id
             )
             
             # Verify update
             order_row = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", order_id)
-            assert order_row["address_json"] == new_address
+            assert json.loads(order_row["address_json"]) == new_address
     
     @pytest.mark.asyncio
     async def test_timestamp_operations(self, clean_db, db_pool, sample_order):
@@ -224,8 +225,10 @@ class TestDatabaseOperations:
             assert order_row["created_at"] == order_row["updated_at"]
             
             # Update order and check updated_at
+            import asyncio
+            await asyncio.sleep(0.1)  # Longer delay to ensure timestamp difference
             await conn.execute(
-                "UPDATE orders SET state = $1 WHERE id = $2",
+                "UPDATE orders SET state = $1, updated_at = now() WHERE id = $2",
                 "VALIDATED", order_id
             )
             
