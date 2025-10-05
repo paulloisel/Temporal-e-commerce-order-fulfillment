@@ -54,10 +54,10 @@ class TestAPIEndpoints:
         # Verify workflow was started with correct parameters
         mock_temporal_client.start_workflow.assert_called_once()
         call_args = mock_temporal_client.start_workflow.call_args
-        assert call_args[0][1] == DATABASE_URL.replace("+asyncpg", "")  # db_url
-        assert call_args[0][2] == sample_order["order_id"]  # order_id
-        assert call_args[0][3] == sample_payment_id  # payment_id
-        assert call_args[0][4] == sample_address  # address
+        assert call_args[1]["args"][0] == DATABASE_URL.replace("+asyncpg", "")  # db_url
+        assert call_args[1]["args"][1] == sample_order["order_id"]  # order_id
+        assert call_args[1]["args"][2] == sample_payment_id  # payment_id
+        assert call_args[1]["args"][3] == sample_address  # address
     
     def test_start_order_workflow_without_address(self, client_with_mock, mock_temporal_client, sample_order, sample_payment_id):
         """Test starting an order workflow without address."""
@@ -78,7 +78,7 @@ class TestAPIEndpoints:
         
         # Verify workflow was started with empty address
         call_args = mock_temporal_client.start_workflow.call_args
-        assert call_args[0][4] == {}  # empty address
+        assert call_args[1]["args"][3] == {}  # empty address
     
     def test_cancel_order(self, client_with_mock, mock_temporal_client, sample_order):
         """Test canceling an order."""
