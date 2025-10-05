@@ -48,6 +48,7 @@ class OrderWorkflow:
         self.order: Dict[str, Any] = {}
         self.address: Dict[str, Any] = {}
         self.canceled: bool = False
+        self.approved: bool = False
         self.errors: list[str] = []
         self.step: str = "INIT"
 
@@ -56,6 +57,7 @@ class OrderWorkflow:
         workflow.set_signal_handler("cancel_order", self._on_cancel)
         workflow.set_signal_handler("update_address", self._on_update_address)
         workflow.set_signal_handler("dispatch_failed", self._on_dispatch_failed)
+        workflow.set_signal_handler("approve_order", self._on_approve)
 
         try:
             self.step = "RECEIVE"
@@ -74,9 +76,18 @@ class OrderWorkflow:
                                             task_queue=ORDER_TASK_QUEUE)
             if self.canceled: raise workflow.ApplicationError("Canceled")
 
-            # Manual review timer (simulated delay)
+            # Manual review - wait for human approval signal
             self.step = "MANUAL_REVIEW"
-            await asyncio.sleep(2)
+            self.approved = False
+            
+            # Wait for approval signal with timeout
+            try:
+                await workflow.wait_condition(
+                    lambda: self.approved,
+                    timeout=timedelta(seconds=30)  # 30-second timeout for approval
+                )
+            except workflow.TimeoutError:
+                raise workflow.ApplicationError("Manual approval timeout - order rejected")
 
             self.step = "PAY"
             await workflow.execute_activity("ChargePayment", 
@@ -108,6 +119,9 @@ class OrderWorkflow:
 
     def _on_dispatch_failed(self, reason: str) -> None:
         self.errors.append(f"dispatch_failed: {reason}")
+
+    def _on_approve(self) -> None:
+        self.approved = True
 
     @workflow.query
     def status(self) -> Dict[str, Any]:

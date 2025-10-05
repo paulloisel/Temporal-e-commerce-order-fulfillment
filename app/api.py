@@ -31,7 +31,7 @@ async def start(order_id: str, body: StartBody):
         ],
         id=f"order-{order_id}",
         task_queue=ORDER_TASK_QUEUE,
-        run_timeout=timedelta(seconds=15),
+        run_timeout=timedelta(seconds=60),  # Extended timeout for manual approval
     )
     return {"workflow_id": handle.id, "run_id": handle.first_execution_run_id}
 
@@ -50,6 +50,13 @@ async def update_address(order_id: str, body: UpdateAddressBody):
     client: Client = app.state.client
     handle = client.get_workflow_handle(f"order-{order_id}")
     await handle.signal("update_address", body.address)
+    return {"ok": True}
+
+@app.post("/orders/{order_id}/signals/approve")
+async def approve_order(order_id: str):
+    client: Client = app.state.client
+    handle = client.get_workflow_handle(f"order-{order_id}")
+    await handle.signal("approve_order")
     return {"ok": True}
 
 @app.get("/orders/{order_id}/status")

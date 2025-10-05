@@ -59,6 +59,9 @@ python scripts/cli.py status order-123
 # Cancel workflow
 python scripts/cli.py cancel order-123
 
+# Approve workflow for payment
+python scripts/cli.py approve order-123
+
 # List workflows
 python scripts/cli.py list
 
@@ -77,15 +80,16 @@ python scripts/test-workflow.py
 | **GET** | `/orders/{order_id}/status` | Queries workflow status |
 | **POST** | `/orders/{order_id}/signals/cancel` | Sends cancel signal |
 | **POST** | `/orders/{order_id}/signals/update-address` | Updates shipping address |
+| **POST** | `/orders/{order_id}/signals/approve` | Approves order for payment |
 
 ## 🔄 Workflow Design
 
 ### OrderWorkflow (Parent)
-- **Steps**: `ReceiveOrder → ValidateOrder → (Timer: ManualReview) → ChargePayment → ShippingWorkflow`
-- **Signals**: `CancelOrder`, `UpdateAddress`, `DispatchFailed`
-- **Timer**: 2-second manual review delay
+- **Steps**: `ReceiveOrder → ValidateOrder → (ManualReview) → ChargePayment → ShippingWorkflow`
+- **Signals**: `CancelOrder`, `UpdateAddress`, `DispatchFailed`, `ApproveOrder`
+- **Manual Review**: Waits for human approval signal (30-second timeout)
 - **Child Workflow**: `ShippingWorkflow` on separate task queue
-- **Time Constraint**: 15 seconds total execution
+- **Time Constraint**: 60 seconds total execution (extended for approval process)
 
 ### ShippingWorkflow (Child)
 - **Activities**: `PreparePackage`, `DispatchCarrier`

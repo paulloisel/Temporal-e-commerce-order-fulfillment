@@ -176,16 +176,17 @@ Content-Type: application/json
 **Steps:**
 1. **RECEIVE** - `ReceiveOrder` activity
 2. **VALIDATE** - `ValidateOrder` activity  
-3. **MANUAL_REVIEW** - 2-second timer (simulated human approval)
+3. **MANUAL_REVIEW** - Wait for human approval signal (30-second timeout)
 4. **PAY** - `ChargePayment` activity
 5. **SHIP** - Start `ShippingWorkflow` child workflow
 
 **Signals:**
 - `cancel_order` - Cancels workflow before shipment
 - `update_address` - Updates shipping address
+- `approve_order` - Approves order for payment processing
 - `dispatch_failed` - Handles shipping failures
 
-**Time Constraint:** 15 seconds total execution time
+**Time Constraint:** 60 seconds total execution time (extended for manual approval)
 
 ### ShippingWorkflow (Child)
 

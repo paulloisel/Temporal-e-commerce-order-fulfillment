@@ -45,9 +45,11 @@ This document verifies that all project requirements have been implemented by go
 
 ### Human-in-the-loop
 **Status**: ✅ **IMPLEMENTED**
-- **Location**: `app/workflows.py` - Manual review timer (2-second delay)
-- **Location**: `app/workflows.py` - Signal handlers for cancel and update address
-- **Verification**: CLI demo shows manual review step and signal handling
+- **Location**: `app/workflows.py` - Manual review with approval signal (30-second timeout)
+- **Location**: `app/workflows.py` - Signal handlers for cancel, update address, and approve
+- **Location**: `app/api.py` - POST /orders/{order_id}/signals/approve endpoint
+- **Location**: `scripts/cli.py` - approve command for CLI
+- **Verification**: Workflow waits at MANUAL_REVIEW step until approval signal is received
 
 ### Observability by design
 **Status**: ✅ **IMPLEMENTED**
@@ -85,22 +87,25 @@ This document verifies that all project requirements have been implemented by go
 
 ## ✅ Parent Workflow: OrderWorkflow
 
-### Steps: ReceiveOrder → ValidateOrder → (Timer: ManualReview) → ChargePayment → ShippingWorkflow
+### Steps: ReceiveOrder → ValidateOrder → (ManualReview) → ChargePayment → ShippingWorkflow
 **Status**: ✅ **IMPLEMENTED**
 - **Location**: `app/workflows.py` lines 58-91 - All steps implemented in sequence
-- **Verification**: CLI demo shows progression: RECEIVE → VALIDATE → MANUAL_REVIEW → PAY → SHIP
+- **Location**: `app/workflows.py` lines 77-88 - Manual review with approval signal (not timer)
+- **Verification**: Workflow waits at MANUAL_REVIEW until approval signal received
 
-### Signals: CancelOrder, UpdateAddress
+### Signals: CancelOrder, UpdateAddress, ApproveOrder
 **Status**: ✅ **IMPLEMENTED**
 - **Location**: `app/workflows.py` lines 10-15 - Signal definitions
 - **Location**: `app/workflows.py` lines 98-105 - Signal handlers
+- **Location**: `app/workflows.py` line 123 - ApproveOrder signal handler
 - **Location**: `app/api.py` lines 36-51 - API endpoints for signals
 - **Verification**: CLI cancel and update-address commands work
 
-### Timer: Manual review delay
+### Manual Review: Human approval required
 **Status**: ✅ **IMPLEMENTED**
-- **Location**: `app/workflows.py` lines 76-78 - 2-second manual review timer
-- **Verification**: CLI demo shows MANUAL_REVIEW step with delay
+- **Location**: `app/workflows.py` lines 77-88 - Manual review with approval signal (30-second timeout)
+- **Location**: `app/workflows.py` line 123 - ApproveOrder signal handler
+- **Verification**: Workflow waits at MANUAL_REVIEW until approval signal received
 
 ### Child Workflow: ShippingWorkflow on separate task queue
 **Status**: ✅ **IMPLEMENTED**
@@ -114,10 +119,11 @@ This document verifies that all project requirements have been implemented by go
 - **Location**: `app/workflows.py` lines 62, 70, 84 - Cancel checks after each step
 - **Verification**: CLI tests show graceful failure handling
 
-### Time Constraint: 15 seconds total execution
+### Time Constraint: 60 seconds total execution (extended for approval)
 **Status**: ✅ **IMPLEMENTED**
-- **Location**: `app/api.py` line 33 - run_timeout=timedelta(seconds=15)
-- **Verification**: CLI describe shows RunExpirationTime and actual RunTime < 15s
+- **Location**: `app/api.py` line 34 - run_timeout=timedelta(seconds=60)
+- **Location**: `app/workflows.py` line 85 - approval timeout=timedelta(seconds=30)
+- **Verification**: Extended timeout accommodates manual approval process
 
 ## ✅ Child Workflow: ShippingWorkflow
 
