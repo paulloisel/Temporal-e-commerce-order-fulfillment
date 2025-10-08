@@ -1,5 +1,7 @@
 # Project Requirements Verification
 
+> **Note:** This is a detailed verification document for reference purposes. For getting started, see the main [README.md](README.md).
+
 This document verifies that all project requirements have been implemented by going through each requirement point by point and showing exactly where it exists in the codebase.
 
 ## ✅ Goal Requirements
